@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+assignment-player-rating-app.md
+match_events.csv
+prompt*.md
