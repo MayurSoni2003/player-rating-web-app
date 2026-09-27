@@ -190,6 +190,7 @@ body {
 }
 
 .data-table tbody tr {
+  cursor: pointer;
   transition: background 0.15s ease;
 }
 

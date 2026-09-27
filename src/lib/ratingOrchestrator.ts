@@ -163,9 +163,6 @@ export async function computeAndUpsertRatings(
 
   const playerRows = allPlayers as DbPlayerRow[];
 
-  // Build a lookup: player_id → { name, age_group }
-  const playerLookup = new Map(playerRows.map((p) => [p.id, p]));
-
   // ── Step 3: Group appearances by player ─────────────────────────────────
   // Track: ALL appearances (for matches_played), ELIGIBLE appearances (for rating)
   interface PlayerGrouped {
