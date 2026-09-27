@@ -46,8 +46,23 @@ export function normalizeTeamName(raw: string): string {
 // (they may represent a distinct data entry and should be surfaced as warnings
 // by the validation layer, not silently merged here).
 // ---------------------------------------------------------------------------
+/**
+ * Normalize a player name:
+ *  1. Trim leading/trailing whitespace
+ *  2. Collapse multiple internal spaces to one
+ *  3. Title-case every word
+ *
+ * Why title-case: the source contains "cesar herrera " (lower-case, trailing space)
+ * and "Cesar Herrera" (title-case) as separate rows for the same person. Without
+ * title-casing these would create two distinct player identities. "C. Herrera"
+ * (abbreviated first name) is intentionally preserved as a separate identity per
+ * the data spec — title-case leaves it as "C. Herrera" because \b matches at the
+ * word boundary after the dot.
+ */
 export function normalizePlayerName(raw: string): string {
-  return raw.trim().replace(/\s+/g, ' ');
+  const collapsed = raw.trim().replace(/\s+/g, ' ');
+  // Title-case: uppercase the first letter of every word token
+  return collapsed.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 // ---------------------------------------------------------------------------
