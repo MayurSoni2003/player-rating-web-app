@@ -115,7 +115,7 @@ inspecting the actual file rather than assuming it was clean:
 | Non-ISO dates | `11/04/2026`, `05/04/2026` | Ambiguous as DD/MM vs MM/DD on their own (both day and month ≤ 12). Resolved to **DD/MM/YYYY**, justified by (a) every other match in the file falls between 2026-03-14 and 2026-04-25 — only the DD/MM reading of both dates falls inside that window — and (b) the clubs involved are Spanish, where DD/MM is the locale convention |
 | `passes_completed > passes_attempted` | `Arnau Fuster`, `M-1701` (69 completed vs 65 attempted) | Preserved as-is, not silently clipped or corrected — flagged as a validation warning, since guessing which number is wrong would be inventing data |
 | `minutes_played = 0` with non-zero stats | `Nil Andrade`, `M-1701` | Row kept and shown on the player's detail page, but excluded from rating computation (see Section 5, eligibility rules) |
-| Missing values | 5 separate rows, each missing exactly one field: `position` (Mateo Otero, M-1707), `minutes_played` (Hugo Andrade, M-1506), `touches` (Izan Galan, M-1706), `duels_won` (Javi Quintana, M-1706), `recoveries` (Kike Nogales, M-1506) | Preserved as `NULL`, never coerced to `0` — a missing value and an explicit zero mean different things, and treating them the same would understate those players' real activity |
+| Missing values | 5 separate rows, each missing exactly one field: `position` (Mateo Otero, M-1707 — see Section 5 for how this affects his rating), `minutes_played` (Hugo Andrade, M-1506), `touches` (Izan Galan, M-1706), `duels_won` (Javi Quintana, M-1706), `recoveries` (Kike Nogales, M-1506) | Preserved as `NULL`, never coerced to `0` — a missing value and an explicit zero mean different things, and treating them the same would understate those players' real activity |
 
 Two totals worth stating precisely, since they're easy to get subtly wrong
 and were verified directly against the source file: **365 source rows → 364
@@ -128,29 +128,33 @@ U17)**.
 
 ```mermaid
 flowchart TD
-    A["Cleaned appearances<br/>(already in Supabase)"] --> B{Eligible?}
-    B -->|"minutes NULL or 0"| Z1["Excluded from rating math<br/>(still shown on player's detail page)"]
-    B -->|"position NULL"| Z2["Player marked UNRATED<br/>('Not rated' badge, no crash)"]
-    B -->|"eligible"| C["Assign position group<br/>GK / Defender / Midfielder / Attacker"]
+    A["All of a player's<br/>cleaned appearances"] --> B{"Any appearance has<br/>a valid (non-null) position?"}
+    B -->|"no — every appearance<br/>is missing position"| Z2["Player marked UNRATED<br/>('Not rated' badge, no crash)"]
+    B -->|"yes"| C["Position group derived from<br/>the valid appearance(s)<br/>GK / Defender / Midfielder / Attacker"]
  
-    C --> D1["Per-90 scale count metrics<br/>(20-min floor on the denominator)"]
-    C --> D2["Compute rate metrics<br/>pass %, duel %, dribble %<br/>null if attempts = 0"]
+    C --> D{"minutes NULL or 0<br/>on this appearance?"}
+    D -->|"yes"| Z1["This appearance excluded<br/>from rating math<br/>(still shown on detail page)"]
+    D -->|"no"| E{"Any eligible<br/>appearances remain?"}
+    E -->|"no"| Z2
  
-    D1 --> E["Aggregate to player level<br/>simple mean, null-safe<br/>(nulls skipped in num & denom)"]
-    D2 --> E
+    E -->|"yes"| F1["Per-90 scale count metrics<br/>(20-min floor on the denominator)"]
+    E -->|"yes"| F2["Compute rate metrics<br/>pass %, duel %, dribble %<br/>null if attempts = 0"]
  
-    E --> F["Min-max normalize<br/>within (age_group × position_group)<br/>scaled to 0–1"]
-    F --> G["Weighted sum<br/>1.5× the position's defining metric, 1.0× the rest"]
-    G --> H["+ Card penalty<br/>−(yellow × 0.5 + red × 2.0)<br/>not normalized — always pulls score down"]
-    H --> I[raw_score]
+    F1 --> G["Aggregate to player level<br/>simple mean, null-safe<br/>(nulls skipped in num & denom)"]
+    F2 --> G
  
-    I --> J["Percentile within age_group<br/>(across all position groups together)"]
-    J --> K[Upsert player_ratings]
-    Z2 --> K
+    G --> H["Min-max normalize<br/>within (age_group × position_group)<br/>scaled to 0–1"]
+    H --> I["Weighted sum<br/>1.5× the position's defining metric, 1.0× the rest"]
+    I --> J["+ Card penalty<br/>−(yellow × 0.5 + red × 2.0)<br/>not normalized — always pulls score down"]
+    J --> K[raw_score]
+ 
+    K --> L["Percentile within age_group<br/>(across all position groups together)"]
+    L --> M[Upsert player_ratings]
+    Z2 --> M
  
     style Z1 fill:#333,color:#fff
     style Z2 fill:#7a1f1f,color:#fff
-    style K fill:#1f4d2e,color:#fff
+    style M fill:#1f4d2e,color:#fff
 ```
 
 **Eligibility.** An appearance with `minutes_played` null or `0` is excluded
@@ -162,6 +166,15 @@ missing position on one appearance but a valid position on another (e.g. `Mateo 
 who played `CM` in `M-1704` and had a missing position in `M-1707`), their position group
 is derived from their valid appearance(s) and all eligible appearances contribute to their
 aggregated rating.
+
+> **Caught-and-fixed, not the original design:** an earlier version of this
+> logic excluded a player entirely if *any single* appearance lacked a
+> position, even when another appearance clearly established it. `Mateo
+> Otero` was the case that surfaced this — the detail page's header badge
+> correctly showed "Midfielder" (from his valid appearance) while a separate
+> banner below it claimed no position was ever recorded — a direct
+> contradiction on the same screen that got caught and corrected. See §8 for
+> how this was found. `[confirm: X players rated / Y unrated after the fix]`
 
 **Positions**: GK -> Goal Keeper, CB ->	Center Back, FB ->	Full Back, CM ->	Central, W ->	Winger, ST ->	Striker
 
@@ -319,7 +332,8 @@ were traced back to root cause before moving on.
 four position groups). This was discarded in favor of the leaner ~5-metric
 model in Section 5.
 
-**Where I got stuck.** The most instructive problem in this project was a
+**Where I got stuck.** 
+1. The most instructive problem in this project was a
 real regression, not a hypothetical one: the CSV contains two different
 players both named "Pablo Ruiz" (one U15, one U17), which is exactly why
 player identity was scoped to `(name, age_group)` rather than name alone.
@@ -332,6 +346,20 @@ known duplicate-name case, traced to a single line, and fixed by keying
 identity by `player_id` everywhere past the initial CSV parse. It's the
 strongest evidence in this whole project that the identity design mattered
 in practice.
+
+2. A second, unrelated bug surfaced later, in the eligibility logic rather than
+identity: the original rule excluded a player from rating entirely if *any
+one* of their appearances had a missing `position`, without checking whether
+another appearance of theirs had a valid one. `Mateo Otero` has two
+appearances — one at `CM`, one with a missing position — and the bug
+incorrectly treated him as having no position at all. It was caught by
+noticing a direct contradiction on his own detail page: the header badge
+correctly showed "Midfielder" while a separate "why unrated" banner claimed
+no position was ever recorded. That inconsistency was the tell — two pieces
+of logic disagreeing about the same player is a stronger signal than either
+one looking wrong in isolation. Fixed by deriving a player's position group
+from any valid position across their appearances, and only excluding a
+player entirely when *no* appearance has one.
 
 ---
 
