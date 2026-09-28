@@ -126,6 +126,33 @@ U17)**.
 
 ## 5. How the rating is computed
 
+```mermaid
+flowchart TD
+    A["Cleaned appearances<br/>(already in Supabase)"] --> B{Eligible?}
+    B -->|"minutes NULL or 0"| Z1["Excluded from rating math<br/>(still shown on player's detail page)"]
+    B -->|"position NULL"| Z2["Player marked UNRATED<br/>('Not rated' badge, no crash)"]
+    B -->|"eligible"| C["Assign position group<br/>GK / Defender / Midfielder / Attacker"]
+ 
+    C --> D1["Per-90 scale count metrics<br/>(20-min floor on the denominator)"]
+    C --> D2["Compute rate metrics<br/>pass %, duel %, dribble %<br/>null if attempts = 0"]
+ 
+    D1 --> E["Aggregate to player level<br/>simple mean, null-safe<br/>(nulls skipped in num & denom)"]
+    D2 --> E
+ 
+    E --> F["Min-max normalize<br/>within (age_group × position_group)<br/>scaled to 0–1"]
+    F --> G["Weighted sum<br/>1.5× the position's defining metric, 1.0× the rest"]
+    G --> H["+ Card penalty<br/>−(yellow × 0.5 + red × 2.0)<br/>not normalized — always pulls score down"]
+    H --> I[raw_score]
+ 
+    I --> J["Percentile within age_group<br/>(across all position groups together)"]
+    J --> K[Upsert player_ratings]
+    Z2 --> K
+ 
+    style Z1 fill:#333,color:#fff
+    style Z2 fill:#7a1f1f,color:#fff
+    style K fill:#1f4d2e,color:#fff
+```
+
 **Eligibility.** An appearance with `minutes_played` null or `0` is excluded
 from rating math (but still shown on the player's detail page). A player is
 excluded from rating entirely if their position is unrecorded, or if none of
