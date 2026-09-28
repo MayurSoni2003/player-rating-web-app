@@ -502,7 +502,7 @@ export default function PlayersListPage() {
                       Player {sortIcon('name')}
                     </th>
                     <th>Age</th>
-                    <th className="hidden sm:table-cell">Position</th>
+                    <th>Position</th>
                     <th
                       className={`sort-header text-right ${sortField === 'percentile' ? 'active' : ''}`}
                       onClick={() => handleSort('percentile')}
@@ -538,12 +538,6 @@ export default function PlayersListPage() {
                           <span className="font-medium text-foreground group-hover:text-accent-hover transition-colors">
                             {p.name}
                           </span>
-                          {/* Show position on mobile where the column is hidden */}
-                          {p.position_group && (
-                            <span className="sm:hidden ml-2 badge badge-position text-[0.65rem]">
-                              {p.position_group}
-                            </span>
-                          )}
                         </td>
                         <td>
                           <span
@@ -552,7 +546,7 @@ export default function PlayersListPage() {
                             {p.age_group}
                           </span>
                         </td>
-                        <td className="hidden sm:table-cell">
+                        <td>
                           {p.position_group ? (
                             <span className="badge badge-position">
                               {p.position_group}

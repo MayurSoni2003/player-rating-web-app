@@ -65,7 +65,7 @@ async function main() {
 
   console.log(`  Found ${appearancesWithNullPos?.length ?? 0} appearance(s) with NULL position:`);
   for (const app of appearancesWithNullPos ?? []) {
-    const p = (app as any).players;
+    const p = (app as unknown as { players: { id: string; name: string; age_group: string } }).players;
     // Check all appearances for this player
     const { data: allPlayerApps } = await supabase
       .from('appearances')
