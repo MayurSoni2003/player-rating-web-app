@@ -155,11 +155,13 @@ flowchart TD
 
 **Eligibility.** An appearance with `minutes_played` null or `0` is excluded
 from rating math (but still shown on the player's detail page). A player is
-excluded from rating entirely if their position is unrecorded, or if none of
-their appearances are otherwise eligible — they still appear in the list,
-with an explicit "Not rated" state, not a blank or a zero. In this dataset,
-exactly one player falls into this: `Mateo Otero` (U17, his only appearance
-has no recorded position).
+excluded from rating entirely if no valid position is recorded across any of
+their appearances, or if none of their appearances meet the playing time threshold —
+they still appear in the list with an explicit "Not rated" state. If a player has a
+missing position on one appearance but a valid position on another (e.g. `Mateo Otero`,
+who played `CM` in `M-1704` and had a missing position in `M-1707`), their position group
+is derived from their valid appearance(s) and all eligible appearances contribute to their
+aggregated rating.
 
 **Positions**: GK -> Goal Keeper, CB ->	Center Back, FB ->	Full Back, CM ->	Central, W ->	Winger, ST ->	Striker
 

@@ -87,16 +87,16 @@ function isIneligible(app: AppearanceRow): boolean {
 }
 
 /**
- * Derive why a player is unrated — per spec §5:
- *  - any appearance has position IS NULL → "No valid position recorded for this player."
+ * Derive why a player is unrated:
+ *  - every appearance has position IS NULL / unknown → "No valid position recorded for this player."
  *  - every appearance has minutes_played IS NULL or = 0 → "No appearances met the minimum playing time threshold."
  */
 function deriveUnratedReason(appearances: AppearanceRow[]): string {
   if (appearances.length === 0) {
     return 'No appearances recorded for this player.';
   }
-  const hasNullPosition = appearances.some((a) => a.position === null);
-  if (hasNullPosition) {
+  const hasAnyValidPosition = appearances.some((a) => getPositionGroup(a.position) !== null);
+  if (!hasAnyValidPosition) {
     return 'No valid position recorded for this player.';
   }
   const allIneligible = appearances.every(

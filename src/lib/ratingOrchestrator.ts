@@ -221,29 +221,23 @@ export async function computeAndUpsertRatings(
   const pipelineMap = new Map<string, PlayerPipelineData>();
 
   for (const [pid, g] of byPlayer) {
-    // Position group: determined from eligible appearances' positions only.
-    //
-    // IMPORTANT ELIGIBILITY RULE (per spec §1 + Mateo Otero example):
-    // If ANY eligible appearance has a null/unknown position, the player is
-    // excluded from rating entirely. We cannot safely assign a position group
-    // for a player whose classification is ambiguous across appearances.
-    // Mateo Otero (M-1707 null, M-1704 CM) is the canonical example —
-    // the spec explicitly requires him to be unrated.
-    const eligiblePositions = g.eligibleInputs.map((i) => i.position);
-    const hasAnyNullPosition = eligiblePositions.some((p) => getPositionGroup(p) === null);
-    const positionGroup = hasAnyNullPosition ? null : resolvePositionGroup(eligiblePositions);
+    // Position group: derived at the PLAYER level from non-null positions across appearances.
+    // Collect all non-null positions and resolve to the modal position group.
+    // A player is only unrated for position if EVERY appearance has a null/unknown position.
+    const nonNullPositions = g.allPositions.filter((p): p is string => p !== null && p !== undefined);
+    const positionGroup = resolvePositionGroup(nonNullPositions);
 
-    // Ineligibility checks (per spec §1)
+    // Ineligibility checks:
     let ineligibleReason: string | null = null;
     if (g.eligibleInputs.length === 0) {
       ineligibleReason = 'No eligible appearances (all minutes are null or 0)';
-    } else if (hasAnyNullPosition) {
-      ineligibleReason = 'Cannot assign position group: at least one eligible appearance has null/unknown position (e.g. Mateo Otero M-1707)';
     } else if (positionGroup === null) {
-      ineligibleReason = 'Cannot assign position group (all eligible appearances have null/unknown position)';
+      ineligibleReason = 'No valid position recorded for this player (all appearances have null position)';
     }
 
     // Per-appearance metrics → aggregate
+    // Note: Eligible appearances (minutes > 0) with a null position still contribute to the player's
+    // aggregated counting and rate stats once the player's overall position group is known.
     let agg = null;
     if (ineligibleReason === null) {
       const perAppMetrics = g.eligibleInputs

@@ -229,9 +229,9 @@ async function main() {
   printPlayer('Pablo Ruiz (U15)', details.get(pabloU15Player.id));
   printPlayer('Pablo Ruiz (U17)', details.get(pabloU17Player.id));
 
-  // 3. Mateo Otero — should be UNRATED (position was null in an eligible appearance)
+  // 3. Mateo Otero — should be RATED (position CM derived from M-1704)
   const mateo = findByName('Mateo Otero');
-  printPlayer('Mateo Otero (should be UNRATED)', mateo);
+  printPlayer('Mateo Otero (U17 Midfielder)', mateo);
 
   if (mateo?.player_id) {
     const { data: mateoRating } = await supabase
@@ -241,11 +241,11 @@ async function main() {
       .single();
 
     if (mateoRating) {
-      const scoreOk = mateoRating.overall_score === null;
-      const pctOk = mateoRating.percentile === null;
+      const scoreOk = mateoRating.overall_score !== null;
+      const pctOk = mateoRating.percentile !== null;
       console.log('\n  Mateo Otero in player_ratings:');
-      console.log(`    overall_score  = ${mateoRating.overall_score}  ${scoreOk ? '✅ null (not rated)' : '❌ should be null'}`);
-      console.log(`    percentile     = ${mateoRating.percentile}  ${pctOk ? '✅ null (not rated)' : '❌ should be null'}`);
+      console.log(`    overall_score  = ${mateoRating.overall_score}  ${scoreOk ? '✅ non-null (rated)' : '❌ should be rated'}`);
+      console.log(`    percentile     = ${mateoRating.percentile}  ${pctOk ? '✅ non-null (rated)' : '❌ should be rated'}`);
       console.log(`    matches_played = ${mateoRating.matches_played}`);
     }
   }
